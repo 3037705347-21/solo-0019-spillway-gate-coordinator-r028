@@ -21,3 +21,9 @@ func NewService(repository storage.Repository) *Service {
 		newToken:   randomToken,
 	}
 }
+
+// Now exposes the service clock for read-side derivations such as the current
+// shift phase.
+func (s *Service) Now() time.Time {
+	return s.now()
+}

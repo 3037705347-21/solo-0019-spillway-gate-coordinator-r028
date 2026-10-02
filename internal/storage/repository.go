@@ -23,8 +23,22 @@ type Repository interface {
 		ctx context.Context,
 		commandID string,
 		token string,
-		operator string,
+		operatorID string,
 		simulateFault bool,
 		now time.Time,
 	) (domain.GateCommand, domain.Gate, error)
+
+	RegisterOperator(ctx context.Context, operator domain.Operator) error
+	Operator(ctx context.Context, id string) (domain.Operator, error)
+	RevokeOperator(ctx context.Context, id string, now time.Time) (domain.Operator, error)
+
+	CreateArea(ctx context.Context, area domain.ControlArea) (domain.ControlArea, error)
+	Area(ctx context.Context, id string) (domain.ControlArea, error)
+
+	CreateShift(ctx context.Context, shift domain.Shift) error
+	Shift(ctx context.Context, id string) (domain.Shift, error)
+	EndShift(ctx context.Context, id string, now time.Time) (domain.Shift, error)
+
+	CreateAssignment(ctx context.Context, assignment domain.ShiftAssignment) (domain.ShiftAssignment, error)
+	Assignment(ctx context.Context, id string) (domain.ShiftAssignment, error)
 }

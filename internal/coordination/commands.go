@@ -82,7 +82,7 @@ func (s *Service) ExecuteCommand(
 		ctx,
 		commandID,
 		request.Token,
-		request.Operator,
+		request.OperatorID,
 		request.SimulateFault,
 		s.now(),
 	)

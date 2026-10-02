@@ -27,6 +27,7 @@ type GateCommand struct {
 	Interlock        *InterlockDecision
 	ExecutionToken   string
 	ExecutedBy       string
+	ExecutionDuty    *ExecutionDuty
 	TerminalReason   string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
@@ -112,18 +113,20 @@ func (c *GateCommand) Review(decision InterlockDecision, token string, now time.
 	return nil
 }
 
-func (c *GateCommand) BeginExecution(token, operator string, now time.Time) error {
+func (c *GateCommand) BeginExecution(token string, duty ExecutionDuty, now time.Time) error {
 	if c.Status != CommandApproved {
 		return Conflict("command_not_executable", "only approved commands can execute")
-	}
-	if strings.TrimSpace(operator) == "" {
-		return Invalid("invalid_operator", "operator is required")
 	}
 	if strings.TrimSpace(token) == "" || token != c.ExecutionToken {
 		return Conflict("invalid_execution_token", "execution token is invalid")
 	}
+	if strings.TrimSpace(duty.OperatorID) == "" {
+		return Invalid("invalid_operator", "operator is required")
+	}
 
-	c.ExecutedBy = strings.TrimSpace(operator)
+	dutyCopy := duty
+	c.ExecutedBy = duty.OperatorID
+	c.ExecutionDuty = &dutyCopy
 	c.Status = CommandExecuting
 	c.UpdatedAt = now.UTC()
 	c.Version++

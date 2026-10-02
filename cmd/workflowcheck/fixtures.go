@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"time"
 )
 
 func fixtureGate(
@@ -78,4 +79,85 @@ func fixtureClearReview(
 		return nil, fmt.Errorf("clear fixture interlock response: %w", err)
 	}
 	return command, nil
+}
+
+func fixtureOperator(client *apiClient, id, name string) error {
+	result, err := client.post("/operators", map[string]any{
+		"id":   id,
+		"name": name,
+	})
+	if err != nil {
+		return err
+	}
+	return requireStatus(result, http.StatusCreated, "register fixture operator")
+}
+
+func fixtureArea(client *apiClient, id, name string, gateIDs []string) error {
+	result, err := client.post("/areas", map[string]any{
+		"id":       id,
+		"name":     name,
+		"gate_ids": gateIDs,
+	})
+	if err != nil {
+		return err
+	}
+	return requireStatus(result, http.StatusCreated, "create fixture area")
+}
+
+// fixtureShift creates a shift whose [starts_at, ends_at) window contains now,
+// unless a custom window is supplied.
+func fixtureShift(
+	client *apiClient,
+	id, name string,
+	start, end *time.Time,
+) error {
+	now := time.Now().UTC()
+	windowStart := now.Add(-time.Hour)
+	windowEnd := now.Add(time.Hour)
+	if start != nil {
+		windowStart = *start
+	}
+	if end != nil {
+		windowEnd = *end
+	}
+	result, err := client.post("/shifts", map[string]any{
+		"id":        id,
+		"name":      name,
+		"starts_at": windowStart.Format(time.RFC3339),
+		"ends_at":   windowEnd.Format(time.RFC3339),
+	})
+	if err != nil {
+		return err
+	}
+	return requireStatus(result, http.StatusCreated, "create fixture shift")
+}
+
+func fixtureAssignment(client *apiClient, shiftID, areaID, operatorID string) (string, error) {
+	result, err := client.post("/assignments", map[string]any{
+		"shift_id":    shiftID,
+		"area_id":     areaID,
+		"operator_id": operatorID,
+	})
+	if err != nil {
+		return "", err
+	}
+	if err := requireStatus(result, http.StatusCreated, "create fixture assignment"); err != nil {
+		return "", err
+	}
+	assignment, err := objectField(result.Body, "assignment")
+	if err != nil {
+		return "", fmt.Errorf("create fixture assignment response: %w", err)
+	}
+	return stringField(assignment, "id")
+}
+
+func expectErrorCode(result apiResult, expectedCode, operation string) error {
+	code, err := stringField(result.Body, "code")
+	if err != nil {
+		return fmt.Errorf("%s: %w", operation, err)
+	}
+	if code != expectedCode {
+		return fmt.Errorf("%s: expected error code %q, got %q", operation, expectedCode, code)
+	}
+	return nil
 }

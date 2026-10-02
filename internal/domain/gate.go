@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"regexp"
 	"strings"
 	"time"
 )
@@ -15,11 +14,10 @@ const (
 	GateFaulted  GateStatus = "faulted"
 )
 
-var gateIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{2,31}$`)
-
 type Gate struct {
 	ID              string
 	Name            string
+	AreaID          string
 	Status          GateStatus
 	Aperture        float64
 	MaxAperture     float64
@@ -29,9 +27,9 @@ type Gate struct {
 }
 
 func NewGate(id, name string, maxAperture, initialAperture float64, now time.Time) (Gate, error) {
-	id = strings.TrimSpace(id)
-	if !gateIDPattern.MatchString(id) {
-		return Gate{}, Invalid("invalid_gate_id", "gate id must use lowercase letters, digits, and hyphens")
+	id, err := normalizeIdentifier(id, "invalid_gate_id")
+	if err != nil {
+		return Gate{}, err
 	}
 
 	name = strings.TrimSpace(name)
@@ -54,6 +52,26 @@ func NewGate(id, name string, maxAperture, initialAperture float64, now time.Tim
 		UpdatedAt:   now.UTC(),
 		Version:     1,
 	}, nil
+}
+
+// BindArea assigns an unbound gate to its control area. Rebinding a gate to a
+// different area is rejected so an area's scope cannot be silently moved.
+func (g *Gate) BindArea(areaID string, now time.Time) error {
+	areaID = strings.TrimSpace(areaID)
+	if areaID == "" {
+		return Invalid("invalid_area_reference", "area id is required")
+	}
+	if g.AreaID != "" && g.AreaID != areaID {
+		return Conflict("gate_already_assigned_area", "gate is already bound to another control area")
+	}
+	if g.AreaID == areaID {
+		return nil
+	}
+
+	g.AreaID = areaID
+	g.UpdatedAt = now.UTC()
+	g.Version++
+	return nil
 }
 
 func (g *Gate) Reserve(commandID string, now time.Time) error {

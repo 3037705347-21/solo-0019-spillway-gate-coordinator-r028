@@ -21,7 +21,31 @@ type ReviewInterlockRequest struct {
 }
 
 type ExecuteCommandRequest struct {
-	Operator      string `json:"operator"`
+	OperatorID    string `json:"operator_id"`
 	Token         string `json:"token"`
 	SimulateFault bool   `json:"simulate_fault"`
+}
+
+type RegisterOperatorRequest struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type CreateAreaRequest struct {
+	ID      string   `json:"id"`
+	Name    string   `json:"name"`
+	GateIDs []string `json:"gate_ids"`
+}
+
+type CreateShiftRequest struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	StartsAt string `json:"starts_at"`
+	EndsAt   string `json:"ends_at"`
+}
+
+type CreateAssignmentRequest struct {
+	ShiftID    string `json:"shift_id"`
+	AreaID     string `json:"area_id"`
+	OperatorID string `json:"operator_id"`
 }
