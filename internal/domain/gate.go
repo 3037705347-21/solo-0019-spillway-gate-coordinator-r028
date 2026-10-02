@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"regexp"
 	"strings"
 	"time"
 )
@@ -15,8 +14,6 @@ const (
 	GateFaulted  GateStatus = "faulted"
 )
 
-var gateIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{2,31}$`)
-
 type Gate struct {
 	ID              string
 	Name            string
@@ -29,9 +26,9 @@ type Gate struct {
 }
 
 func NewGate(id, name string, maxAperture, initialAperture float64, now time.Time) (Gate, error) {
-	id = strings.TrimSpace(id)
-	if !gateIDPattern.MatchString(id) {
-		return Gate{}, Invalid("invalid_gate_id", "gate id must use lowercase letters, digits, and hyphens")
+	id, err := validateIdentifier(id, "invalid_gate_id")
+	if err != nil {
+		return Gate{}, err
 	}
 
 	name = strings.TrimSpace(name)

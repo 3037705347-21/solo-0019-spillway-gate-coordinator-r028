@@ -27,6 +27,7 @@ type GateCommand struct {
 	Interlock        *InterlockDecision
 	ExecutionToken   string
 	ExecutedBy       string
+	Duty             *DutyAttestation
 	TerminalReason   string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
@@ -112,18 +113,26 @@ func (c *GateCommand) Review(decision InterlockDecision, token string, now time.
 	return nil
 }
 
-func (c *GateCommand) BeginExecution(token, operator string, now time.Time) error {
+// BeginExecution moves an approved command into executing. The duty attestation
+// has already been resolved against the live roster and is frozen onto the
+// command here so later handovers cannot rewrite the on-duty fact.
+func (c *GateCommand) BeginExecution(token string, duty DutyAttestation, now time.Time) error {
 	if c.Status != CommandApproved {
 		return Conflict("command_not_executable", "only approved commands can execute")
 	}
-	if strings.TrimSpace(operator) == "" {
+	if strings.TrimSpace(duty.OperatorID) == "" {
 		return Invalid("invalid_operator", "operator is required")
+	}
+	if strings.TrimSpace(duty.ShiftID) == "" {
+		return Invalid("invalid_duty_shift", "an active duty shift is required")
 	}
 	if strings.TrimSpace(token) == "" || token != c.ExecutionToken {
 		return Conflict("invalid_execution_token", "execution token is invalid")
 	}
 
-	c.ExecutedBy = strings.TrimSpace(operator)
+	dutyCopy := duty
+	c.Duty = &dutyCopy
+	c.ExecutedBy = duty.OperatorID
 	c.Status = CommandExecuting
 	c.UpdatedAt = now.UTC()
 	c.Version++

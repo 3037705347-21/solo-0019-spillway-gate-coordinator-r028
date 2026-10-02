@@ -16,10 +16,18 @@ func NewRouter(service *coordination.Service) http.Handler {
 	mux.HandleFunc("GET /health", h.health)
 	mux.HandleFunc("POST /gates", h.registerGate)
 	mux.HandleFunc("GET /gates/{id}", h.gate)
+	mux.HandleFunc("GET /gates/{id}/coverage", h.gateCoverage)
 	mux.HandleFunc("POST /commands", h.requestCommand)
 	mux.HandleFunc("GET /commands/{id}", h.command)
 	mux.HandleFunc("POST /commands/{id}/interlock", h.reviewInterlock)
 	mux.HandleFunc("POST /commands/{id}/execute", h.executeCommand)
+	mux.HandleFunc("POST /operators", h.registerOperator)
+	mux.HandleFunc("GET /operators/{id}", h.operator)
+	mux.HandleFunc("POST /operators/{id}/revoke", h.revokeOperator)
+	mux.HandleFunc("POST /shifts", h.createShift)
+	mux.HandleFunc("GET /shifts/{id}", h.shift)
+	mux.HandleFunc("POST /shifts/{id}/assignments", h.assignShiftOperator)
+	mux.HandleFunc("POST /shifts/{id}/end", h.endShift)
 	return recoverMiddleware(mux)
 }
 

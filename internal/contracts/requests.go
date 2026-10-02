@@ -25,3 +25,21 @@ type ExecuteCommandRequest struct {
 	Token         string `json:"token"`
 	SimulateFault bool   `json:"simulate_fault"`
 }
+
+type RegisterOperatorRequest struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	ValidUntil string `json:"valid_until"`
+}
+
+type CreateShiftRequest struct {
+	ID       string   `json:"id"`
+	Label    string   `json:"label"`
+	StartsAt string   `json:"starts_at"`
+	EndsAt   string   `json:"ends_at"`
+	GateIDs  []string `json:"gate_ids"`
+}
+
+type AssignShiftRequest struct {
+	OperatorID string `json:"operator_id"`
+}

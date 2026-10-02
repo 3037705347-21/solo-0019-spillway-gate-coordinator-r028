@@ -134,3 +134,26 @@ func prettyBody(body map[string]any) string {
 	}
 	return string(encoded)
 }
+
+func errorCode(result apiResult) string {
+	value, exists := result.Body["code"]
+	if !exists {
+		return ""
+	}
+	code, _ := value.(string)
+	return code
+}
+
+func nowOffset(offset time.Duration) string {
+	return time.Now().UTC().Add(offset).Format(time.RFC3339)
+}
+
+func expectConflictCode(result apiResult, expectedCode string, operation string) error {
+	if err := requireStatus(result, http.StatusConflict, operation); err != nil {
+		return err
+	}
+	if code := errorCode(result); code != expectedCode {
+		return fmt.Errorf("%s: expected error code %q, got %q", operation, expectedCode, code)
+	}
+	return nil
+}

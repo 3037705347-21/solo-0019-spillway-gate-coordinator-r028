@@ -8,13 +8,16 @@
 
 - 运行协调员：登记闸门并提交开度调整命令。
 - 安全复核员：提交联锁结论，决定命令是否通过。
-- 闸门操作员：凭执行令牌启动命令并登记执行结果。
+- 闸门操作员：登记操作员资格，凭执行令牌启动命令并登记执行结果。
+- 值班负责人：维护操作员资格、值班班次、当班执行人和负责闸门范围。
 
 ## 核心实体
 
 - `gate`：闸门及其当前开度、运行状态、最大开度和活动命令。
-- `gate_command`：一次开度调整申请，包含目标开度、申请原因、状态和执行令牌。
+- `gate_command`：一次开度调整申请，包含目标开度、申请原因、状态、执行令牌和启动移动时冻结的当班事实。
 - `interlock_decision`：安全复核结论，状态为 clear 或 blocked。
+- `operator`：操作员资格登记，状态为 active 或 revoked，可带有效期。
+- `duty_shift`：值班班次，包含起止窗口、负责闸门范围、当班执行人名单和可能的提前结束时间。
 
 ## 业务流程
 
@@ -32,18 +35,31 @@
 
 ### execute-gate-command
 
-闸门操作员通过 `POST /commands/{id}/execute` 提交执行令牌。服务校验命令、令牌、闸门占用关系和目标开度，在临界区内完成 approved、executing、completed 或 aborted 的转换，并同步更新闸门状态。令牌在命令结束后失效，不能复用。
+闸门操作员通过 `POST /commands/{id}/execute` 提交执行令牌。服务校验命令、令牌、闸门占用关系和目标开度，并在同一临界区内解析当前当班事实：操作员资格必须存在且 active 未过期，必须有一条未结束的当班班次覆盖该闸门，且操作员在该班次的执行人名单中。校验通过后命令进入 executing，并把班次、操作员、负责闸门和校验时间作为当班快照冻结在命令上，随后完成 approved、executing、completed 或 aborted 的转换并同步更新闸门状态。令牌在命令结束后失效，不能复用；当班快照不随后交班、改派或资格吊销而改写。
+
+### register-operator
+
+值班负责人通过 `POST /operators` 登记操作员资格，可提供 RFC3339 的 `valid_until`；重复标识返回稳定冲突。`POST /operators/{id}/revoke` 吊销资格，吊销是单向终态，不影响已完成命令上冻结的当班事实。
+
+### manage-duty-shift
+
+值班负责人通过 `POST /shifts` 创建班次（RFC3339 起止时间、负责闸门列表），通过 `POST /shifts/{id}/assignments` 维护当班执行人，通过 `POST /shifts/{id}/end` 提前交班。同一闸门的两个班次在有效窗口上重叠时（仅端点相接不算重叠），创建新班次返回 `shift_handover_contention`，必须先结束旧班次；把同一操作员重复加入班次返回 `duplicate_shift_assignment`；向已结束班次加人或再次结束返回 `shift_already_ended`。`GET /gates/{id}/coverage` 返回某闸门当前是 covered、unattended 还是 contended。
 
 ## 状态与规则
 
 - `gate` 状态：idle、reserved、moving、faulted。
 - `gate_command` 状态：pending、approved、rejected、executing、completed、aborted。
+- `operator` 状态：active、revoked；存在 `valid_until` 时，到点即视为资格失效。
+- `duty_shift` 派生状态：scheduled、active、ended；提前结束后有效窗口截断到结束时间。
 - 只有 pending 命令可以复核。
 - 只有 approved 命令可以执行，且执行令牌必须匹配。
+- 只有“资格有效 + 被一条 active 班次覆盖 + 在该班次名单内”的操作员才能启动移动。
+- 无班次覆盖闸门返回 `gate_unattended`；多条 active 班次竞争同一闸门返回 `shift_handover_contention`；操作员所在覆盖班次已结束返回 `shift_already_ended`；操作员不属于当班机组返回 `operator_not_on_duty`；资格缺失、被吊销或过期返回 not found 或 `operator_credential_invalid`。
 - clear 复核与闸门占用必须同时成功；任一步失败时两者都不写入。
 - blocked 复核使命令 rejected，不会占用闸门。
 - 模拟故障会令命令 aborted、闸门 faulted，并保留最终开度。
 - 已完成或已中止的命令不能再次执行。
+- 命令上的当班快照在执行瞬间写入，历史命令永远保留执行当时的当班事实。
 
 ## 模块边界
 
@@ -60,10 +76,18 @@
 - `GET /health`
 - `POST /gates`
 - `GET /gates/{id}`
+- `GET /gates/{id}/coverage`
 - `POST /commands`
 - `GET /commands/{id}`
 - `POST /commands/{id}/interlock`
 - `POST /commands/{id}/execute`
+- `POST /operators`
+- `GET /operators/{id}`
+- `POST /operators/{id}/revoke`
+- `POST /shifts`
+- `GET /shifts/{id}`
+- `POST /shifts/{id}/assignments`
+- `POST /shifts/{id}/end`
 
 错误响应统一为：
 

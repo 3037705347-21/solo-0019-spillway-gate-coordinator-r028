@@ -21,3 +21,8 @@ func NewService(repository storage.Repository) *Service {
 		newToken:   randomToken,
 	}
 }
+
+// Now exposes the service clock so views can derive lifecycle status.
+func (s *Service) Now() time.Time {
+	return s.now().UTC()
+}

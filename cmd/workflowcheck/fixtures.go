@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"time"
 )
 
 func fixtureGate(
@@ -78,4 +79,63 @@ func fixtureClearReview(
 		return nil, fmt.Errorf("clear fixture interlock response: %w", err)
 	}
 	return command, nil
+}
+
+func fixtureOperator(client *apiClient, id, name string) (map[string]any, error) {
+	result, err := client.post("/operators", map[string]any{
+		"id":   id,
+		"name": name,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := requireStatus(result, http.StatusCreated, "register fixture operator"); err != nil {
+		return nil, err
+	}
+	return objectField(result.Body, "operator")
+}
+
+// fixtureActiveShift creates a shift covering gateIDs that is active now and
+// assigns operators to it.
+func fixtureActiveShift(
+	client *apiClient,
+	id string,
+	gateIDs []string,
+	operators ...string,
+) (map[string]any, error) {
+	start := nowOffset(-1 * time.Minute)
+	end := nowOffset(8 * time.Hour)
+	result, err := client.post("/shifts", map[string]any{
+		"id":        id,
+		"label":     "fixture shift " + id,
+		"starts_at": start,
+		"ends_at":   end,
+		"gate_ids":  gateIDs,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := requireStatus(result, http.StatusCreated, "create fixture shift"); err != nil {
+		return nil, err
+	}
+	shift, err := objectField(result.Body, "shift")
+	if err != nil {
+		return nil, fmt.Errorf("create fixture shift response: %w", err)
+	}
+	for _, operatorID := range operators {
+		assigned, err := client.post("/shifts/"+id+"/assignments", map[string]any{
+			"operator_id": operatorID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if err := requireStatus(assigned, http.StatusOK, "assign fixture operator"); err != nil {
+			return nil, err
+		}
+		shift, err = objectField(assigned.Body, "shift")
+		if err != nil {
+			return nil, err
+		}
+	}
+	return shift, nil
 }
